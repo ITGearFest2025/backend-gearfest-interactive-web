@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:15 
+    container_name: postgres 
+    restart: unless-stopped # Automatically restart the container unless it's explicitly stopped
+
+    ports:
+      - "5432:5432"
+    
+    env_file: 
+      - path: ./.env.local
+  
+    # environment:
+    #   - POSTGRES_USER=user
+    #   - POSTGRES_PASSWORD=password
+    #   - POSTGRES_DB=db
+      # Add other PostgreSQL environment variables as needed (e.g., PGDATA for custom data directory)
+
+    #volumes:
+      #- postgres_data:/var/lib/postgresql/data # Mount a volume for data persistence
+      #- ../postgresql/postgresql.conf:/var/lib/postgresql/data/postgresql.conf # Mount the modified config file
+
+    # healthcheck: # Add a healthcheck to ensure PostgreSQL is ready
+    #   test: ["CMD-SHELL", "pg_isready -U postgres -d test"] # Replace your_database_name
+    #   interval: 10s # Check every 10 seconds
+    #   timeout: 5s # Timeout after 5 seconds
+    #   retries: 5 # Retry 5 times
+    #   start_period: 30s # Give the container 30 seconds to start before health checks begin
+
+# volumes:
+#   postgres_data:  # Define the named volume
