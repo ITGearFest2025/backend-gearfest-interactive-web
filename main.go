@@ -23,36 +23,24 @@ type Star struct {
 func initDB() {
 
 	var err error
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Bangkok",
-		os.Getenv("POSTGRES_HOST"),
+	connStr := fmt.Sprintf("host=localhost port=%s user=%s password=%s dbname=%s sslmode=verify-full sslrootcert=./postgresql/certs/CA.crt sslkey=./postgresql/certs/postgresdb.key sslcert=./postgresql/certs/postgresdb.crt",
+		os.Getenv("POSTGRES_PORT"),
 		os.Getenv("POSTGRES_USER"),
 		os.Getenv("POSTGRES_PASSWORD"),
-		os.Getenv("POSTGRES_DB"),
-		os.Getenv("POSTGRES_PORT"))
+		os.Getenv("POSTGRES_DB"))
 
-	/* WARNING -> := declare local vaiable, so the line below WILL NOT WORK */
-	/* db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})				*/
-
-	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
-
-	// Migrate the schema
-	db.AutoMigrate(&Star{})
-
+	db, err = gorm.Open(postgres.Open(connStr), &gorm.Config{})
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
-	// Set connection pool options (important for concurrency)
-	//db.SetMaxOpenConns(100) // Adjust as needed
-	//db.SetMaxIdleConns(10)  // Adjust as needed
-	//db.SetConnMaxLifetime(time.Minute * 5) // Adjust as needed
+	fmt.Println("Connected to PostgreSQL with GORM and SSL successful")
 
-	// Test connection
-	// if err := db.Ping(); err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	fmt.Println("Connected to PostgreSQL")
+	// AutoMigrate will create tables if they don't exist
+	err = db.AutoMigrate(&Star{})
+	if err != nil {
+		log.Fatal("Error during AutoMigrate:", err)
+	}
 }
 
 func LoadEnv() {
