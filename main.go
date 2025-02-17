@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -12,7 +14,17 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	preQuerySetNum  = 50
+	starsNumInSet   = 20
+	refreshInterval = time.Second * 20
+
+	postQueueSize = 10000
+)
+
 var db *gorm.DB
+var starCache = [preQuerySetNum]*[starsNumInSet]Star{}
+var postChannel = make(chan *Star, postQueueSize)
 
 type Star struct {
 	ID      uint   `gorm:"primaryKey" json:"-"`
@@ -42,20 +54,10 @@ func initDB() {
 		log.Panic(err)
 	}
 
-	// Set connection pool options (important for concurrency)
-	//db.SetMaxOpenConns(100) // Adjust as needed
-	//db.SetMaxIdleConns(10)  // Adjust as needed
-	//db.SetConnMaxLifetime(time.Minute * 5) // Adjust as needed
-
-	// Test connection
-	// if err := db.Ping(); err != nil {
-	// 	log.Fatal(err)
-	// }
-
 	fmt.Println("Connected to PostgreSQL")
 }
 
-func LoadEnv() {
+func loadEnv() {
 	// local development
 	err := godotenv.Load(".env.local")
 	if err != nil {
@@ -63,15 +65,90 @@ func LoadEnv() {
 	}
 }
 
-func getStar(c *gin.Context) {
+func main() {
+	loadEnv()
+	initDB()
+	setupCache()
+	r := setupRouter()
 
-	var stars []Star
-	db.Limit(10).Find(&stars)
+	r.Run(":8080")
+}
+
+func setupCache() {
+	populateGetStarCache()   // Populate the cache initially
+	go refreshGetStarCache() // Refresh the cache periodically in the background
+
+	go processeCreateStar()
+}
+
+func setupRouter() *gin.Engine {
+
+	r := gin.Default()
+
+	r.GET("/ping", func(c *gin.Context) {
+		c.String(http.StatusOK, "pong")
+	})
+
+	r.GET("/api/message", getStar)
+	r.POST("/api/message", createStar)
+
+	return r
+}
+
+/* GET star sections */
+func getRandomWordsFromDB() (*[starsNumInSet]Star, error) {
+	var stars [starsNumInSet]Star
+	if err := db.Raw("SELECT * FROM stars ORDER BY RANDOM() LIMIT ?", starsNumInSet).Find(&stars).Error; err != nil {
+		return nil, err
+	}
+	return &stars, nil
+}
+
+func populateGetStarCache() {
+	for i := 0; i < preQuerySetNum; i++ {
+		stars, err := getRandomWordsFromDB()
+		if err != nil {
+			log.Printf("Error querying random words from DB: %v", err)
+			continue
+		}
+
+		starCache[i] = stars
+	}
+}
+
+func refreshGetStarCache() {
+	ticker := time.NewTicker(refreshInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		populateGetStarCache()
+		log.Println("Word cache refreshed.")
+	}
+}
+
+func getStar(c *gin.Context) {
+	randomIndex := rand.Intn(preQuerySetNum)
+
+	if starCache[randomIndex] == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to get stars: caching don't work, please resend a request",
+		})
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data":   stars,
+		"data":   *starCache[randomIndex],
 	})
+}
+
+/* POST star sections */
+func processeCreateStar() { // Worker goroutine
+	for star := range postChannel { // Range over the channel (blocks until data)
+		if err := db.Create(&star).Error; err != nil {
+			log.Println("Database error:", err)
+		}
+	}
 }
 
 func createStar(c *gin.Context) {
@@ -93,42 +170,21 @@ func createStar(c *gin.Context) {
 		return
 	}
 
-	result := db.Create(&star)
+	select {
+	case postChannel <- &star: // Try to send the task
+		// Task sent successfully
 
-	if result.Error != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "failed",
-			"message": "create error",
+	case <-time.After(time.Second): // Timeout if the queue is full
+		// Channel is full (or at least was for the timeout duration)
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":  "unavaliable",
+			"message": "the server is under heavy load, please resend soon",
 		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"status":  "success",
-		"name":    star.Name,
-		"message": star.Message,
+	c.JSON(http.StatusAccepted, gin.H{
+		"status":  "accept",
+		"message": "your star will be created soon",
 	})
-}
-
-func SetupRouter() *gin.Engine {
-	// Disable Console Color
-	// gin.DisableConsoleColor()
-	r := gin.Default()
-
-	r.GET("/ping", func(c *gin.Context) {
-		c.String(http.StatusOK, "pong")
-	})
-
-	r.GET("/api/message", getStar)
-	r.POST("/api/message", createStar)
-
-	return r
-}
-
-func main() {
-	LoadEnv()
-	initDB()
-	r := SetupRouter()
-
-	r.Run(":8080")
 }
