@@ -9,16 +9,16 @@ services:
     
     env_file: 
       - path: ./.env.local
-  
-    # environment:
-    #   - POSTGRES_USER=user
-    #   - POSTGRES_PASSWORD=password
-    #   - POSTGRES_DB=db
+
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=db
       # Add other PostgreSQL environment variables as needed (e.g., PGDATA for custom data directory)
 
-    #volumes:
-      #- postgres_data:/var/lib/postgresql/data # Mount a volume for data persistence
-      #- ../postgresql/postgresql.conf:/var/lib/postgresql/data/postgresql.conf # Mount the modified config file
+    volumes:
+      - postgres-data:/var/lib/postgresql/data # Mount a volume for data persistence
+        #- ../postgresql/postgresql.conf:/var/lib/postgresql/data/postgresql.conf # Mount the modified config file
 
     # healthcheck: # Add a healthcheck to ensure PostgreSQL is ready
     #   test: ["CMD-SHELL", "pg_isready -U postgres -d test"] # Replace your_database_name
@@ -26,6 +26,20 @@ services:
     #   timeout: 5s # Timeout after 5 seconds
     #   retries: 5 # Retry 5 times
     #   start_period: 30s # Give the container 30 seconds to start before health checks begin
+    
+  pgadmin:
+    container_name: pgadmin_fortest
+    image: dpage/pgadmin4:8
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      - ./config_local.py:/pgadmin4/config_local.py
 
-# volumes:
-#   postgres_data:  # Define the named volume
+volumes:
+  postgres-data:  # Define the named volume
+  pgadmin-data:

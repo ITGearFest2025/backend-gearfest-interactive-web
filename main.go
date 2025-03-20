@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	preQuerySetNum  = 50
+	preQuerySetNum  = 30
 	starsNumInSet   = 20
 	refreshInterval = time.Second * 20
 
-	postQueueSize = 10000
+	postQueueSize = 500
 )
 
 var db *gorm.DB
@@ -102,6 +102,9 @@ func setupRouter() *gin.Engine {
 
 	r.GET("/api/message", getStar)
 	r.POST("/api/message", createStar)
+	r.POST("/api/donate", createDonation)
+	r.GET("/api/top-donate", getTopDonate)
+	r.GET("/api/total-donate", getTotalDonation)
 
 	return r
 }
@@ -168,7 +171,7 @@ func createStar(c *gin.Context) {
 	if err := c.BindJSON(&star); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
-			"message": "binding error",
+			"message": "body binding error: " + err.Error(),
 		})
 		return
 	}
@@ -198,4 +201,100 @@ func createStar(c *gin.Context) {
 		"status":  "accept",
 		"message": "your star will be created soon",
 	})
+}
+
+/* POST donation */
+func createDonation(c *gin.Context) {
+	var donation Donation
+	if err := c.BindJSON(&donation); err != nil {
+
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "body binding error: " + err.Error(),
+		})
+		return
+	}
+
+	if donation.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "name must not be null",
+		})
+		return
+	}
+
+	if donation.Amount <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "amount must be greater than 0",
+		})
+		return
+	}
+
+	if donation.TaxDeduction && (!valStr(donation.Fullname) || !valStr(donation.Email) || !valStr(donation.NationalID)) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "fullname, email, and national_id must not be empty or null",
+		})
+		return
+	}
+
+	if err := db.Create(&donation).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "creation error: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"status":  "success",
+		"message": "donation created",
+	})
+
+}
+
+type TopDonationHolder struct {
+	Name          string  `json:"name"`
+	TotalDonation float32 `json:"total_donation"`
+}
+
+func getTopDonate(c *gin.Context) {
+	var topDonationHolder [10]TopDonationHolder
+	queryString := "SELECT name, sum(amount) AS total_donation FROM donations GROUP BY name ORDER BY total_donation DESC LIMIT 10"
+
+	if err := db.Raw(queryString).Find(&topDonationHolder).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to get top donation: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   topDonationHolder,
+	})
+}
+
+func getTotalDonation(c *gin.Context) {
+	var totalDonation float32
+	queryString := "SELECT sum(amount) AS total_donation FROM donations"
+
+	if err := db.Raw(queryString).Find(&totalDonation).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to get total donation: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   totalDonation,
+	})
+}
+
+func valStr(in *string) bool {
+	return in != nil && *in != ""
 }
