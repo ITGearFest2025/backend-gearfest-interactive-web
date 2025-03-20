@@ -20,6 +20,16 @@ type Star struct {
 	Message string `json:"message"`
 }
 
+type Donation struct {
+	ID           uint    `gorm:"primaryKey" json:"-"`
+	Name         string  `json:"name"`
+	Amount       float32 `json:"amount"`
+	TaxDeduction bool    `json:"tax_deduction"`
+	NationalID   *string `json:"national_id"`
+	Fullname     *string `json:"fullname"`
+	Email        *string `json:"email"`
+}
+
 func initDB() {
 
 	var err error
@@ -37,6 +47,7 @@ func initDB() {
 
 	// Migrate the schema
 	db.AutoMigrate(&Star{})
+	db.AutoMigrate(&Donation{})
 
 	if err != nil {
 		log.Panic(err)
