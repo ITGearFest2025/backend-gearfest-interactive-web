@@ -9,17 +9,16 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 const (
-	preQuerySetNum  = 30
-	starsNumInSet   = 20
-	refreshInterval = time.Second * 20
+	preQuerySetNum  = 30               // number of cache in one time
+	starsNumInSet   = 20               // number of word inside one cache
+	refreshInterval = time.Second * 20 // refresh interval for cache
 
-	postQueueSize = 500
+	postQueueSize = 500 // createStar queue size
 )
 
 var db *gorm.DB
@@ -45,12 +44,11 @@ type Donation struct {
 func initDB() {
 
 	var err error
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Bangkok",
-		os.Getenv("POSTGRES_HOST"),
-		os.Getenv("POSTGRES_USER"),
-		os.Getenv("POSTGRES_PASSWORD"),
-		os.Getenv("POSTGRES_DB"),
-		os.Getenv("POSTGRES_PORT"))
+	dsn := fmt.Sprintf("host=gearfest-db user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Bangkok",
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_DBNAME"),
+		os.Getenv("DB_PORT"))
 
 	/* WARNING -> := declare local vaiable, so the line below WILL NOT WORK */
 	/* db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})				*/
@@ -65,19 +63,11 @@ func initDB() {
 		log.Panic(err)
 	}
 
-	fmt.Println("Connected to PostgreSQL")
-}
-
-func loadEnv() {
-	// local development
-	err := godotenv.Load(".env.local")
-	if err != nil {
-		log.Panic(err)
-	}
+	log.Println("connected to postgresql")
 }
 
 func main() {
-	loadEnv()
+
 	initDB()
 	setupCache()
 	r := setupRouter()
@@ -94,6 +84,7 @@ func setupCache() {
 
 func setupRouter() *gin.Engine {
 
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
 	r.GET("/ping", func(c *gin.Context) {

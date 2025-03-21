@@ -1,45 +1,49 @@
 services:
-  postgres:
+  gearfest-db:
     image: postgres:15 
-    container_name: postgres 
-    restart: unless-stopped # Automatically restart the container unless it's explicitly stopped
+    restart: unless-stopped
 
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:${DB_PORT}"
     
-    env_file: 
-      - path: ./.env.local
-
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=db
-      # Add other PostgreSQL environment variables as needed (e.g., PGDATA for custom data directory)
+      POSTGRES_USER: "${DB_USER}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_DBNAME}"
 
     volumes:
-      - postgres-data:/var/lib/postgresql/data # Mount a volume for data persistence
-        #- ../postgresql/postgresql.conf:/var/lib/postgresql/data/postgresql.conf # Mount the modified config file
-
-    # healthcheck: # Add a healthcheck to ensure PostgreSQL is ready
-    #   test: ["CMD-SHELL", "pg_isready -U postgres -d test"] # Replace your_database_name
-    #   interval: 10s # Check every 10 seconds
-    #   timeout: 5s # Timeout after 5 seconds
-    #   retries: 5 # Retry 5 times
-    #   start_period: 30s # Give the container 30 seconds to start before health checks begin
+      - gearfest-data:/var/lib/postgresql/data # Mount a volume for data persistence
+        # - ../postgresql/postgresql.conf:/var/lib/postgresql/data/postgresql.conf # Mount the modified config file
     
-  pgadmin:
-    container_name: pgadmin_fortest
-    image: dpage/pgadmin4:8
-    restart: always
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: root
+  gearfest-app:
+    build:
+      context: ./app  
+      dockerfile: Dockerfile 
+
+    depends_on:
+      - gearfest-db
+
     ports:
-      - "5050:80"
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
-      - ./config_local.py:/pgadmin4/config_local.py
+      - "${APP_PORT}:${APP_PORT}"
+
+    environment:
+      DB_USER: "${DB_USER}"
+      DB_PASSWORD: "${DB_PASSWORD}"
+      DB_DBNAME: "${DB_DBNAME}"
+      DB_PORT: "${DB_PORT}"
+
+  # pgadmin:
+    # container_name: pgadmin_fortest
+    # image: dpage/pgadmin4:8
+    # restart: always
+    # environment:
+      # PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      # PGADMIN_DEFAULT_PASSWORD: root
+    # ports:
+      # - "5050:80"
+    # volumes:
+      # - pgadmin-data:/var/lib/pgadmin
+      # - ./config_local.py:/pgadmin4/config_local.py
 
 volumes:
-  postgres-data:  # Define the named volume
-  pgadmin-data:
+  gearfest-data:
