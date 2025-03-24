@@ -39,6 +39,7 @@ type Donation struct {
 	NationalID   *string `json:"national_id"`
 	Fullname     *string `json:"fullname"`
 	Email        *string `json:"email"`
+	Bill         *string `json:"bill"`
 }
 
 func initDB() {
@@ -57,7 +58,29 @@ func initDB() {
 
 	// Migrate the schema
 	db.AutoMigrate(&Star{})
-	db.AutoMigrate(&Donation{})
+
+	migrator := db.Migrator()
+
+	// Check if the table exists.
+	if !migrator.HasTable(&Donation{}) {
+		fmt.Println("Table 'Donation' does not exist. Auto-migrating.")
+		if err := migrator.AutoMigrate(&Donation{}); err != nil {
+			panic(err)
+		}
+		fmt.Println("Table 'Donation' created successfully.")
+
+	} else {
+		fmt.Println("Table 'Donation' exists. Checking for 'bill' column.")
+
+		// Check if the 'Image' column exists.
+		if !migrator.HasColumn(&Donation{}, "bill") {
+			fmt.Println("Image column does not exist. Adding it.")
+			if err := migrator.AddColumn(&Donation{}, "bill"); err != nil {
+				panic(err)
+			}
+			fmt.Println("bill column added successfully.")
+		}
+	}
 
 	if err != nil {
 		log.Panic(err)

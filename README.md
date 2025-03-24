@@ -17,8 +17,9 @@ to run
     - national_id   | string (nullable)
     - fullname      | string (nullable)
     - email         | string (nullable)
+    - bill          | string (nullable, meant to store in base64)
 
-  - if tax_deduction is `true`, `national_id`, `fullname`, and `email` must not be null
+  - if tax_deduction is true, `national_id`, `fullname`, `email`, and `bill` must not be null
 
 - all api failed response will look like this
   - message: error message
